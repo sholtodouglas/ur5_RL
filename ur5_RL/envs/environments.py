@@ -158,6 +158,7 @@ class ur5Env(gym.GoalEnv):
         self.action_space = spaces.Box(act_low, act_high) 
         high_obs = np.inf * np.ones([obs_dim])
         high_goal = np.inf * np.ones([goal_dim])
+        
         self.observation_space = spaces.Dict(dict(
             desired_goal=spaces.Box(-high_goal, high_goal),
             achieved_goal=spaces.Box(-high_goal, high_goal),
@@ -226,6 +227,7 @@ class ur5Env(gym.GoalEnv):
             colSphereId = self._p.createCollisionShape(self._p.GEOM_SPHERE,radius=sphereRadius)
             
             if self._renders:
+                self._p.resetDebugVisualizerCamera(0.75,90,-45,[0,0,0])
                 self.goal = self._p.createMultiBody(mass,colSphereId,1,[1,1,1.4])
                 collisionFilterGroup = 0
                 collisionFilterMask = 0
@@ -265,7 +267,10 @@ class ur5Env(gym.GoalEnv):
             if goal_pos is None: 
                 goal_x  = self.np_random.uniform(low=-self.TARG_LIMIT, high=self.TARG_LIMIT)
                 goal_y  = self.np_random.uniform(low=-self.TARG_LIMIT, high=self.TARG_LIMIT)
-                goal_z = self.np_random.uniform(low=0.1, high=self.TARG_LIMIT)
+                if self.ag_only_self:
+                        goal_z = self.np_random.uniform(low=0.2, high=self.TARG_LIMIT)
+                else:
+                    goal_z = self.np_random.uniform(low=0.05, high=0.05)
                 goal_pos = [goal_x,goal_y,goal_z]
 
             self.goal_pos = goal_pos
@@ -350,7 +355,6 @@ class ur5Env(gym.GoalEnv):
 
         action = np.array(action)
         # self.action_buffer.append(action[0:7])
-        # action[0:7] = self.action_buffer.get() # get a moving average
         if self.relative:
             action[0:7] = action[0:7]**3
             action = list(action)

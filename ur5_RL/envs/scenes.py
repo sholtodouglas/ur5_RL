@@ -3,9 +3,13 @@ from kuka import kuka
 from ur5 import ur5
 import pybullet_data
 import math 
-import os
+import os, inspect
+currentdir = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
+print("current_dir=" + currentdir)
+os.sys.path.insert(0, currentdir)
+
 urdfRoot=pybullet_data.getDataPath()
-meshPath = os.getcwd()+"/meshes/objects/"
+meshPath = currentdir+"/meshes/objects/"
 print(meshPath)
 
 def load_arm_dim_up(p,arm, dim = 'Z'):
