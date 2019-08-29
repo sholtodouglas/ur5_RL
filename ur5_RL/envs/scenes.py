@@ -28,7 +28,7 @@ def load_arm_dim_up(p,arm, dim = 'Z'):
 		_arm.setPosition([0,0,0.3], [arm_rot[0],arm_rot[1],arm_rot[2],arm_rot[3]])
 	else:
 		arm_rot =p.getQuaternionFromEuler([0,0.0,0])
-		_arm.setPosition([-0.5,0.0,-0.1], [arm_rot[0],arm_rot[1],arm_rot[2],arm_rot[3]])
+		_arm.setPosition([-0.6,0.0,-0.1], [arm_rot[0],arm_rot[1],arm_rot[2],arm_rot[3]])
 	return _arm
 
 

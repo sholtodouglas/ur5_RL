@@ -67,6 +67,16 @@ image_renderer = p.ER_BULLET_HARDWARE_OPENGL # if the rendering throws errors, u
 #                                       p.readUserDebugParameter(4),
 #                                       p.readUserDebugParameter(5)])
 
+class RingBuffer:
+    def __init__(self, size):
+        self.data = [np.zeros(7) for i in range(0,size)]
+
+    def append(self, x):
+        self.data.pop(0)
+        self.data.append(x)
+
+    def get(self):
+        return np.mean(self.data, axis = 0)
 
 
 
@@ -112,7 +122,8 @@ class ur5Env(gym.GoalEnv):
         self.physics_client_active = 0
         self.relative = relative
         self._seed()
-
+        self.action_buffer = RingBuffer(10)
+        self.roving_goal = False
         if pos_cntrl:
             action_dim = 8
         else:
@@ -338,8 +349,10 @@ class ur5Env(gym.GoalEnv):
             #update_camera(self._p)
 
         action = np.array(action)
+        # self.action_buffer.append(action[0:7])
+        # action[0:7] = self.action_buffer.get() # get a moving average
         if self.relative:
-            action[0:7] = action[0:7]
+            action[0:7] = action[0:7]**3
             action = list(action)
 
             observation = self._arm.state()
@@ -369,6 +382,12 @@ class ur5Env(gym.GoalEnv):
         obs = self.getSceneObservation()
         reward = self.compute_reward(obs['achieved_goal'], obs['desired_goal'])
 
+        if self.roving_goal:
+            
+            if self._envStepCounter % 60 == 0:
+                    print('rove')
+                    self.reset_goal_pos()
+
         return obs, reward, False, {}
 
 
@@ -385,13 +404,16 @@ class ur5Env(gym.GoalEnv):
 
         distance = np.sum(abs(achieved_goal-desired_goal))
         
-        if distance < 0.05:
-            reward  = 10.0
+        if distance < 0.03:
+            reward  = 50.0
         else:
             reward = 0.0
         
         
         return reward
+
+    def activate_roving_goal(self):
+        self.roving_goal = True
 
     def gripper_camera(self,obs): 
         # Center of mass position and orientation (of link-7)
