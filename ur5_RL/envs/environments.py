@@ -67,6 +67,32 @@ image_renderer = p.ER_BULLET_HARDWARE_OPENGL # if the rendering throws errors, u
 #                                       p.readUserDebugParameter(4),
 #                                       p.readUserDebugParameter(5)])
 
+viewMatrix = p.computeViewMatrixFromYawPitchRoll(cameraTargetPosition = [0,0,0], distance = 0.4, yaw = 45, pitch = -35, roll = 0, upAxisIndex = 2) 
+viewMatrix_1 = p.computeViewMatrixFromYawPitchRoll(cameraTargetPosition = [0,0,0], distance = 0.4, yaw = 135, pitch = -35, roll = 0, upAxisIndex = 2) 
+
+projectionMatrix = p.computeProjectionMatrixFOV(fov = 120,aspect = 1,nearVal = 0.01,farVal = 10)
+
+
+def gripper_camera(obs):
+    # Center of mass position and orientation (of link-7)
+    pos = obs[0:3] 
+    ori = obs[7:11] # last 4
+    # rotation = list(p.getEulerFromQuaternion(ori))
+    # rotation[2] = 0
+    # ori = p.getQuaternionFromEuler(rotation)
+
+    rot_matrix = p.getMatrixFromQuaternion(ori)
+    rot_matrix = np.array(rot_matrix).reshape(3, 3)
+    # Initial vectors
+    init_camera_vector = (1, 0, 0) # z-axis
+    init_up_vector = (0, 1, 0) # y-axis
+    # Rotated vectors
+    camera_vector = rot_matrix.dot(init_camera_vector)
+    up_vector = rot_matrix.dot(init_up_vector)
+    view_matrix_gripper = p.computeViewMatrix(pos, pos + 0.1 * camera_vector, up_vector)
+    img = p.getCameraImage(200, 200, view_matrix_gripper, projectionMatrix,shadow=0, flags = p.ER_NO_SEGMENTATION_MASK, renderer=p.ER_BULLET_HARDWARE_OPENGL)
+    return img
+
 class RingBuffer:
     def __init__(self, size):
         self.data = [np.zeros(7) for i in range(0,size)]
@@ -98,7 +124,8 @@ class ur5Env(gym.GoalEnv):
                  state_arm_pose=True,
                  only_xyz = True,
                  num_objects = 0,
-                 relative=False):
+                 relative=False,
+                 only_xyzr=True):
         #pos_cntrl is whether we control the motors or we control the position of 
         # head and gripper. 
         # ag_only_self is whether we want to have the objects as the achieved goal
@@ -119,6 +146,7 @@ class ur5Env(gym.GoalEnv):
         self.ag_only_self = ag_only_self
         self.state_arm_pose = state_arm_pose
         self.only_xyz = only_xyz
+        self.only_xyzr = only_xyzr
         self.physics_client_active = 0
         self.relative = relative
         self._seed()
@@ -227,7 +255,7 @@ class ur5Env(gym.GoalEnv):
             colSphereId = self._p.createCollisionShape(self._p.GEOM_SPHERE,radius=sphereRadius)
             
             if self._renders:
-                self._p.resetDebugVisualizerCamera(0.75,90,-45,[0,0,0])
+                self._p.resetDebugVisualizerCamera(1.25,90,-45,[0,0,0])
                 self.goal = self._p.createMultiBody(mass,colSphereId,1,[1,1,1.4])
                 collisionFilterGroup = 0
                 collisionFilterMask = 0
@@ -270,7 +298,7 @@ class ur5Env(gym.GoalEnv):
                 if self.ag_only_self:
                         goal_z = self.np_random.uniform(low=0.2, high=self.TARG_LIMIT)
                 else:
-                    goal_z = self.np_random.uniform(low=0.05, high=0.05)
+                    goal_z = self.np_random.uniform(low=0.00, high=0.1)
                 goal_pos = [goal_x,goal_y,goal_z]
 
             self.goal_pos = goal_pos
@@ -289,7 +317,7 @@ class ur5Env(gym.GoalEnv):
                 self._p.changeConstraint(self.goal_cid,goal_pos, maxForce = 100)
 
     def reset_objects(self, positions=None):
-
+        
         for idx, o in enumerate(self.objects):
             if positions is None: 
                 new_x  = self.np_random.uniform(low=-self.TARG_LIMIT, high=self.TARG_LIMIT)
@@ -299,7 +327,9 @@ class ur5Env(gym.GoalEnv):
             else:
                 new_pos = positions[idx]
 
-            self._p.resetBasePositionAndOrientation(o, new_pos[0:3], new_pos[3:7])
+           
+
+            self._p.resetBasePositionAndOrientation(o[0], new_pos[0:3], new_pos[3:7])
 
     def initialize_start_pos(self,start_state):
         # the only time we will be initializeing this is if we have the joint positions.
@@ -325,6 +355,7 @@ class ur5Env(gym.GoalEnv):
             observation =  list(arm_obs['pos']) +   list(arm_obs['gripper']) + list(arm_obs['pos_vel'])+ list(arm_obs['orn']) + list(arm_obs['joint_positions']) #+ list(arm_obs['orn_vel'])#+ list(arm_obs['joint_velocities'])
         else:
             # size 3 + 1 + 3
+
             observation = list(arm_obs['pos']) + list(arm_obs['gripper']) + list(arm_obs['pos_vel'])
 
         #top_down_img =self._p.getCameraImage(500, 500, viewMatrix,projectionMatrix, shadow=0,renderer=image_renderer)
@@ -445,7 +476,7 @@ class ur5Env_objects(ur5Env):
                  renders=False,
                  ag_only_self=False,
                  ):
-        super().__init__(renders = renders, ag_only_self = ag_only_self, num_objects=1)
+        super().__init__(renders = renders, ag_only_self = ag_only_self, num_objects=1, relative = True)
 
 class ur5Env_reacher_relative(ur5Env):
     def __init__(self,
@@ -529,6 +560,7 @@ def move_in_xyz(environment, arm, abs_rel):
 
         state, reward, done, info = environment.step(action)
         obs = environment.getSceneObservation()
+        gripper_camera(state['observation'])
 
 ##############################################################################################################
 

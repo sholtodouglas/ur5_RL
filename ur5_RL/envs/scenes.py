@@ -86,8 +86,14 @@ def load_lab_Z_up(p):
 	return [jenga, block_red, block_blue, plate]
 
 def one_block_scene(p):
+	planeId = p.loadURDF(os.path.join(urdfRoot,"plane.urdf"), [0,0,-0.1])
 	block_red = [p.loadURDF((os.path.join(meshPath,"cube_small.urdf")), [0.0,0.0,0.05],[0.400000,0.0,0.000000,1.0])]
 	table = [p.loadURDF((os.path.join(urdfRoot,"table/table.urdf")), [0.0,0.0,-0.6300],[0.000000,0.000000,0.0,1.0])]
+	colwallId = p.createCollisionShape(p.GEOM_BOX,halfExtents=[0.05,1.0,0.5])
+	wall = [p.createMultiBody(0,colwallId ,2,[1.0,0,0.0], p.getQuaternionFromEuler([0,0,0]))]
+	wall = [p.createMultiBody(0,colwallId ,2,[-1.0,0,0.0], p.getQuaternionFromEuler([0,0,0]))]
+	wall = [p.createMultiBody(0,colwallId ,2,[0,1.0,0], p.getQuaternionFromEuler([0,0,math.pi/2]))]
+	wall = [p.createMultiBody(0,colwallId ,2,[0,-1.0,0], p.getQuaternionFromEuler([0,0,math.pi/2]))]
 	return [block_red]
 
 def basic_scene(p):

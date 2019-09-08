@@ -4,10 +4,35 @@ import os
 import math
 import pickle
 import socket
-
+import time
 HOST = '127.0.0.1'  # The server's hostname or IP address
 PORT = 65432        # The port used by the server
 
+viewMatrix = p.computeViewMatrixFromYawPitchRoll(cameraTargetPosition = [0,0,0], distance = 0.4, yaw = 45, pitch = -35, roll = 0, upAxisIndex = 2) 
+viewMatrix_1 = p.computeViewMatrixFromYawPitchRoll(cameraTargetPosition = [0,0,0], distance = 0.4, yaw = 135, pitch = -35, roll = 0, upAxisIndex = 2) 
+
+projectionMatrix = p.computeProjectionMatrixFOV(fov = 120,aspect = 1,nearVal = 0.01,farVal = 10)
+
+
+def gripper_camera(obs):
+    # Center of mass position and orientation (of link-7)
+    pos = obs[0:3] 
+    ori = obs[7:11] # last 4
+    # rotation = list(p.getEulerFromQuaternion(ori))
+    # rotation[2] = 0
+    # ori = p.getQuaternionFromEuler(rotation)
+
+    rot_matrix = p.getMatrixFromQuaternion(ori)
+    rot_matrix = np.array(rot_matrix).reshape(3, 3)
+    # Initial vectors
+    init_camera_vector = (1, 0, 0) # z-axis
+    init_up_vector = (0, 1, 0) # y-axis
+    # Rotated vectors
+    camera_vector = rot_matrix.dot(init_camera_vector)
+    up_vector = rot_matrix.dot(init_up_vector)
+    view_matrix_gripper = p.computeViewMatrix(pos, pos + 0.1 * camera_vector, up_vector)
+    img = p.getCameraImage(200, 200, view_matrix_gripper, projectionMatrix,shadow=0, flags = p.ER_NO_SEGMENTATION_MASK, renderer=p.ER_BULLET_HARDWARE_OPENGL)
+    return img
 
 
 def move_in_xyz(environment, arm, abs_rel,s, record, play_sequence):
@@ -77,26 +102,28 @@ def move_in_xyz(environment, arm, abs_rel,s, record, play_sequence):
         
 
         try:
-            print('sending')
+            #print('sending')
             s.sendall(b'Hello, world')
-            print('recieving')
+            #print('recieving')
             data = s.recv(1024)
             action = pickle.loads(data)
-            print('Received', action )
+            #print('Received', action )
             state, reward, done, info = environment.step(action)
-            
-
+            grip_img = gripper_camera(state['observation'])
+            #time.sleep(0.01)
             if record:
                 file = '/'+str(time.time_ns()) # folder named for the time in nanoseconds
                 print(file)
                 make_dir(play_sequence+file)
+                print(play_sequence+file)
                 #save_image(img_arr, play_sequence+file+'/standard_cam_left')
                 #save_image(img_arr2, play_sequence+file+'/standard_cam_right')
                 #save_image(grip_img,  play_sequence+file+'/gripper_cam')
                 np.save(play_sequence+file+'/obs',np.array(state['observation']))
                 np.save(play_sequence+file+'/act',action)
 
-        except:
+        except Exception as e:
+            print(e)
             print("Connection Failed")
 
         
@@ -108,16 +135,20 @@ def move_in_xyz(environment, arm, abs_rel,s, record, play_sequence):
 ######################################
 def make_dir(string):
     try:
+        print('trying')
         os.makedirs(string)
+        print('wtf')
     except FileExistsError:
-        pass # directory already exists
-
+        print('FileExistsError')
+        
 def make_new_play_data_folder():
     traj_count = 0
+    make_dir('play_data')
+    print('***********')
     for i in next(os.walk('play_data'))[1]:
         if 'set' in i:
             traj_count += 1 # count the number of previous trajectories
-    dir_string = '../play_data/set_'+str(traj_count)
+    dir_string = os.getcwd()+'/play_data/set_'+str(traj_count)
     make_dir(dir_string)
     return dir_string
 
@@ -162,7 +193,7 @@ def launch( arm, abs_rel, record):
 @click.option('--abs_rel', type=str, default='abs',
               help='absolute or relative positioning, abs doesnt really work with rbx1 yet')
 @click.option('--arm', type=str, default='ur5', help='rbx1 or kuka')
-@click.option('--record', type=bool, default=False, help='recording')
+@click.option('--record', type=bool, default=True, help='recording')
 def main(**kwargs):
     launch(**kwargs)
 

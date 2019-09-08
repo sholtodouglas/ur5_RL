@@ -1,7 +1,0 @@
-README.md
-setup.py
-ur5_RL.egg-info/PKG-INFO
-ur5_RL.egg-info/SOURCES.txt
-ur5_RL.egg-info/dependency_links.txt
-ur5_RL.egg-info/requires.txt
-ur5_RL.egg-info/top_level.txt
