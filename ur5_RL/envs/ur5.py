@@ -215,13 +215,13 @@ class ur5:
             else:
                 poses.append(motorCommands[i])
                 indexes.append(joint.id)
-                forces.append(joint.maxForce*100)
+                forces.append(joint.maxForce)
 
         l = len(poses)
         
         if self.three_D:
             self._p.setJointMotorControlArray(self.uid, indexes, self._p.POSITION_CONTROL, targetPositions=poses, targetVelocities =[0.0]*l, 
-                                positionGains = [0.2]*l, forces = forces)
+                                positionGains = [0.03]*l, forces = forces)
         #holy shit this is so much faster in arrayform!
         else:
             # well this is just a bit shit hey - if we want this to work, need to fix the positions of 0,4,5,7.

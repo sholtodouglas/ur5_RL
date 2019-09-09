@@ -87,11 +87,11 @@ def load_lab_Z_up(p):
 
 def one_block_scene(p):
 	planeId = p.loadURDF(os.path.join(urdfRoot,"plane.urdf"), [0,0,-0.1])
-	colcubeId = p.createCollisionShape(p.GEOM_BOX, halfExtents=[0.015, 0.015, 0.015])
-	object = [p.createMultiBody(0.1, colcubeId, 2, [0, 0, 0.05], [0.000000,0.000000,0.0,1.0])]
+	#colcubeId = p.createCollisionShape(p.GEOM_BOX, halfExtents=[0.025, 0.025, 0.025])
+	#object = [p.createMultiBody(0.1, colcubeId, 2, [0, 0, 0.05], [0.000000,0.000000,0.0,1.0])]
 
 
-	#block_red = [p.loadURDF((os.path.join(meshPath,"cube_small.urdf")), [0.0,0.0,0.05],[0.400000,0.0,0.000000,1.0])]
+	object = [p.loadURDF((os.path.join(meshPath,"cube_small.urdf")), [0.0,0.0,0.05],[0.400000,0.0,0.000000,1.0])]
 	table = [p.loadURDF((os.path.join(urdfRoot,"table/table.urdf")), [0.0,0.0,-0.6300],[0.000000,0.000000,0.0,1.0])]
 	colwallId = p.createCollisionShape(p.GEOM_BOX,halfExtents=[0.05,1.0,0.5])
 	wall = [p.createMultiBody(0,colwallId ,2,[1.0,0,0.0], p.getQuaternionFromEuler([0,0,0]))]
