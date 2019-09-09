@@ -417,6 +417,7 @@ class ur5Env(gym.GoalEnv):
 
         #if self._renders:
             #update_camera(self._p)
+        print(time.time())
 
         action = np.array(action)
         new_x,new_y = action[0], action[1]
@@ -472,8 +473,8 @@ class ur5Env(gym.GoalEnv):
 
         for i in range(self._actionRepeat):
             self._p.stepSimulation()
-            if self._renders:
-                time.sleep(self._timeStep/self._actionRepeat)
+            #if self._renders:
+                #time.sleep(self._timeStep/self._actionRepeat)
             
             self._envStepCounter += 1
 

@@ -218,7 +218,7 @@ class ur5:
                 forces.append(joint.maxForce)
 
         l = len(poses)
-        
+        position_gains = [0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.03, 0.03]
         if self.three_D:
             self._p.setJointMotorControlArray(self.uid, indexes, self._p.POSITION_CONTROL, targetPositions=poses, targetVelocities =[0.0]*l, 
                                 positionGains = [0.03]*l, forces = forces)

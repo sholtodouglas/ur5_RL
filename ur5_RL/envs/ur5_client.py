@@ -85,6 +85,9 @@ def move_in_xyz(environment, arm, abs_rel,s, record, play_sequence):
     motorsIds.append(environment._p.addUserDebugParameter("fingerAngle", 0, 1.5, .3))
 
     done = False
+    actions = []
+    observations = []
+    step = 0
     while (not done):
 
         action = []
@@ -112,15 +115,15 @@ def move_in_xyz(environment, arm, abs_rel,s, record, play_sequence):
             grip_img = gripper_camera(state['observation'])
             #time.sleep(0.01)
             if record:
-                file = '/'+str(time.time_ns()) # folder named for the time in nanoseconds
-                print(file)
-                make_dir(play_sequence+file)
-                print(play_sequence+file)
-                #save_image(img_arr, play_sequence+file+'/standard_cam_left')
-                #save_image(img_arr2, play_sequence+file+'/standard_cam_right')
-                #save_image(grip_img,  play_sequence+file+'/gripper_cam')
-                np.save(play_sequence+file+'/obs',np.array(state['observation']))
-                np.save(play_sequence+file+'/act',action)
+                print(time.time())
+
+                actions.append(action)
+                observations.append(np.array(state['observation']))
+                step = step + 1
+                if step % 100 == 0:
+
+                    np.save(play_sequence+'/observations',np.array(observations))
+                    np.save(play_sequence+'/actions', np.array(actions))
 
         except Exception as e:
             print(e)
