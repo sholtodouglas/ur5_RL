@@ -419,8 +419,8 @@ class ur5Env(gym.GoalEnv):
             #update_camera(self._p)
         print(time.time())
 
-        action = np.array(action)
-        new_x,new_y = action[0], action[1]
+        action = np.array(action).copy()
+        #new_x,new_y = action[0], action[1]
 
 
         # self.action_buffer.append(action[0:7])
@@ -445,15 +445,16 @@ class ur5Env(gym.GoalEnv):
             # action is xyz positon, orietnation quaternion, gripper closedness.
             commanded_ori = list(action[3:7])
             action[0:3] = list(np.array(action[0:3]) + np.array(observation['pos']))
-            commanded_ori = list((np.array(commanded_ori) + np.array(observation['orn'])))
+            #commanded_ori = list((np.array(commanded_ori) + np.array(observation['orn'])))
             action = action[0:3] + commanded_ori + [action[7]]
 
-            if self.pointmass_test:
-                action[0] = new_x
-                action[1] = new_y
+            # if self.pointmass_test:
+            #     action[0] = new_x
+            #     action[1] = new_y
 
         if self.pointmass_test:
             self._p.changeConstraint(self.mass_cid, [new_x, new_y, -0.025], maxForce=10)
+            #self._p.changeConstraint(self.mass_cid, [action[0], action[1], -0.025], maxForce=10)
         if self.pos_cntrl:
             
             if self.only_xyz: # we want to make sure the orientation here is always down
