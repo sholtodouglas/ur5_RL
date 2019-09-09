@@ -216,7 +216,7 @@
     <child link="left_gripper"/>
     <origin rpy="-1.57 0.0 0.0" xyz="-0.05 0.1 0.005"/>
     <axis xyz="1 0 0"/>
-    <limit effort="300.0" lower="-0.00" upper="0.04" velocity="100"/>
+    <limit effort="10.0" lower="-0.00" upper="0.04" velocity="100"/>
     <dynamics damping="100.0" friction="100.0"/>
   </joint>
 <link name="left_gripper">
@@ -247,7 +247,7 @@
     <child link="right_gripper"/>
     <origin rpy="-1.57 0.0 0.0" xyz="0.05 0.1 -0.005"/>
     <axis xyz="1 0 0"/>
-    <limit effort="300.0" lower="-0.04" upper="0.0" velocity="100"/>
+    <limit effort="10.0" lower="-0.04" upper="0.0" velocity="100"/>
     <dynamics damping="100.0" friction="100.0"/>
   </joint>
   <link name="right_gripper">
