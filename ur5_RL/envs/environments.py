@@ -93,18 +93,6 @@ def gripper_camera(obs):
     img = p.getCameraImage(200, 200, view_matrix_gripper, projectionMatrix,shadow=0, flags = p.ER_NO_SEGMENTATION_MASK, renderer=p.ER_BULLET_HARDWARE_OPENGL)
     return img
 
-class RingBuffer:
-    def __init__(self, size):
-        self.data = [np.zeros(7) for i in range(0,size)]
-
-    def append(self, x):
-        self.data.pop(0)
-        self.data.append(x)
-
-    def get(self):
-        return np.mean(self.data, axis = 0)
-
-
 
 class ur5Env(gym.GoalEnv):
     metadata = {
@@ -114,7 +102,7 @@ class ur5Env(gym.GoalEnv):
 
     def __init__(self,
                  urdfRoot=pybullet_data.getDataPath(),
-                 actionRepeat=1,
+                 actionRepeat=20,
                  isEnableSelfCollision=True,
                  renders=False,
                  arm = 'ur5',
@@ -125,7 +113,10 @@ class ur5Env(gym.GoalEnv):
                  only_xyz = True,
                  num_objects = 0,
                  relative=False,
-                 only_xyzr=True):
+                 only_xyzr=True,
+                 only_xy= False,
+                 reward_scaling = 1,
+                 pointmass_test = False):
         #pos_cntrl is whether we control the motors or we control the position of 
         # head and gripper. 
         # ag_only_self is whether we want to have the objects as the achieved goal
@@ -147,11 +138,14 @@ class ur5Env(gym.GoalEnv):
         self.state_arm_pose = state_arm_pose
         self.only_xyz = only_xyz
         self.only_xyzr = only_xyzr
+        self.only_xy = only_xy
         self.physics_client_active = 0
         self.relative = relative
         self._seed()
-        self.action_buffer = RingBuffer(10)
         self.roving_goal = False
+        self.reward_scaling = reward_scaling
+        self.pointmass_test = pointmass_test
+
         if pos_cntrl:
             action_dim = 8
         else:
@@ -262,15 +256,40 @@ class ur5Env(gym.GoalEnv):
                 print('the moment')
                 self._p.setCollisionFilterGroupMask(self.goal, -1, collisionFilterGroup, collisionFilterMask)
                 self.goal_cid = self._p.createConstraint(self.goal,-1,-1,-1,self._p.JOINT_FIXED,[1,1,1.4],[0,0,0],[0,0,0],[0,0,0,1])
+
+            ############## Feeling cute, might delete later idk #####################################
+            if self.pointmass_test:
+                sphereRadius = 0.03
+                mass = 1
+                visualShapeId = 2
+                colSphereId = self._p.createCollisionShape(p.GEOM_SPHERE, radius=sphereRadius)
+                self.mass = self._p.createMultiBody(mass, colSphereId, visualShapeId, [0, 0, 0.4])
+                # objects = self._p.loadMJCF("/Users/francisdouglas/bullet3/data/mjcf/sphere.xml")
+                # self.mass = objects[0]
+                # self.mass = [p.loadURDF((os.path.join(urdfRoot,"sphere2.urdf")), 0,0.0,1.0,1.00000,0.707107,0.000000,0.707107)]
+                relativeChildPosition = [0, 0, 0]
+                relativeChildOrientation = [0, 0, 0, 1]
+                self.mass_cid = self._p.createConstraint(self.mass, -1, -1, -1, self._p.JOINT_FIXED, [0, 0, 0],
+                                                         [0, 0, 0],
+                                                         relativeChildPosition, relativeChildOrientation)
+
+            ##################################################################################################
+
         else:
             print('Resetting')
 
 
         self._envStepCounter = 0
+        self.reset_objects()
         self.reset_goal_pos()
         self._arm.resetJointPoses()
         arm_obs = self._arm.state()
         self.default_ori = arm_obs['orn']
+
+        if self.pointmass_test:
+            self._p.resetBasePositionAndOrientation(self.mass, [0, 0, 0.05], [0, 0, 0, 1])
+            self._p.changeConstraint(self.mass_cid, [0, 0, 0.05], maxForce=100)
+
 
 
         return self.getSceneObservation()
@@ -299,6 +318,8 @@ class ur5Env(gym.GoalEnv):
                         goal_z = self.np_random.uniform(low=0.2, high=self.TARG_LIMIT)
                 else:
                     goal_z = self.np_random.uniform(low=0.00, high=0.1)
+                if self.only_xy:
+                    goal_z = 0.025
                 goal_pos = [goal_x,goal_y,goal_z]
 
             self.goal_pos = goal_pos
@@ -320,10 +341,10 @@ class ur5Env(gym.GoalEnv):
         
         for idx, o in enumerate(self.objects):
             if positions is None: 
-                new_x  = self.np_random.uniform(low=-self.TARG_LIMIT, high=self.TARG_LIMIT)
-                new_y  = self.np_random.uniform(low=-self.TARG_LIMIT, high=self.TARG_LIMIT)
-                new_z = self.np_random.uniform(low=0.1, high=self.TARG_LIMIT)
-                new_pos = [new_x,new_y,new_z]
+                new_x  = self.np_random.uniform(low=-self.TARG_LIMIT/2, high=self.TARG_LIMIT/2)
+                new_y  = self.np_random.uniform(low=-self.TARG_LIMIT/2, high=self.TARG_LIMIT/2)
+                new_z = self.np_random.uniform(low=0.05, high=0.05)
+                new_pos = [new_x,new_y,new_z, 0,0,0,1]
             else:
                 new_pos = positions[idx]
 
@@ -371,8 +392,20 @@ class ur5Env(gym.GoalEnv):
 
         goal  = np.array(self.goal_pos)
 
+        if self.pointmass_test:
 
-        
+            current_pos = self._p.getBasePositionAndOrientation(self.mass)[0]
+            x, y = current_pos[0], current_pos[1]
+            observation[0] = x
+            observation[1] = y
+            observation[2] = 0.025
+            if self.ag_only_self:
+                achieved_goal[0] = x
+                achieved_goal[1] = y
+                achieved_goal[2] = 0.025
+
+
+
         return {
                 'observation': np.array(observation).copy().astype('float32'),
                 'achieved_goal': achieved_goal.copy().astype('float32'),
@@ -381,13 +414,30 @@ class ur5Env(gym.GoalEnv):
 
     #moves motors to desired pos
     def step(self, action):
+
         #if self._renders:
             #update_camera(self._p)
 
         action = np.array(action)
+        new_x,new_y = action[0], action[1]
+
+
         # self.action_buffer.append(action[0:7])
         if self.relative:
-            action[0:7] = action[0:7]**3
+
+
+
+            if self.pointmass_test:
+                x_shift, y_shift = action[0], action[1]
+
+                current_pos = self._p.getBasePositionAndOrientation(self.mass)[0]
+                x, y = current_pos[0], current_pos[1]
+                new_x, new_y = np.clip(x + x_shift, -self.TARG_LIMIT * 2, self.TARG_LIMIT * 2), np.clip(y + y_shift,
+                                                                                                        -self.TARG_LIMIT * 2,
+                                                                                                        self.TARG_LIMIT * 2)
+
+
+            action[0:7] = action[0:7] * 0.05
             action = list(action)
 
             observation = self._arm.state()
@@ -397,25 +447,40 @@ class ur5Env(gym.GoalEnv):
             commanded_ori = list((np.array(commanded_ori) + np.array(observation['orn'])))
             action = action[0:3] + commanded_ori + [action[7]]
 
+            if self.pointmass_test:
+                action[0] = new_x
+                action[1] = new_y
 
+        if self.pointmass_test:
+            self._p.changeConstraint(self.mass_cid, [new_x, new_y, -0.025], maxForce=10)
         if self.pos_cntrl:
             
             if self.only_xyz: # we want to make sure the orientation here is always down
                 action[3:7] = self.default_ori
+                if self.only_xy:
+
+                    action[2] = 0.1 # suspend above table
+                    action[7] = 1
+                if self.pointmass_test:
+                    action[2] = 0.4 # get it out of the way of pointmass boi
             
             self._arm.move_to(action)
         else:
             self._arm.action(action)
-        
+
+
+
         for i in range(self._actionRepeat):
             self._p.stepSimulation()
             if self._renders:
-                time.sleep(self._timeStep)
+                time.sleep(self._timeStep/self._actionRepeat)
             
             self._envStepCounter += 1
 
         obs = self.getSceneObservation()
-        reward = self.compute_reward(obs['achieved_goal'], obs['desired_goal'])
+
+        reward = self.compute_reward(obs['achieved_goal'], obs['desired_goal']) * self.reward_scaling
+
 
         if self.roving_goal:
             
@@ -440,9 +505,9 @@ class ur5Env(gym.GoalEnv):
         distance = np.sum(abs(achieved_goal-desired_goal))
         
         if distance < 0.03:
-            reward  = 50.0
+            reward  = 1#50.0
         else:
-            reward = 0.0
+            reward = 0#0.0
         
         
         return reward
@@ -475,8 +540,9 @@ class ur5Env_objects(ur5Env):
     def __init__(self,
                  renders=False,
                  ag_only_self=False,
+                 relative= True
                  ):
-        super().__init__(renders = renders, ag_only_self = ag_only_self, num_objects=1, relative = True)
+        super().__init__(renders = renders, ag_only_self = ag_only_self, num_objects=1, relative = relative)
 
 class ur5Env_reacher_relative(ur5Env):
     def __init__(self,
@@ -484,11 +550,44 @@ class ur5Env_reacher_relative(ur5Env):
                  ag_only_self=True,
                  ):
         super().__init__(renders = renders, ag_only_self = ag_only_self, relative=True)
-    
+
+class ur5Env_pointmasstest(ur5Env):
+    def __init__(self,
+                 renders=False,
+                 ag_only_self=True,
+                 pointmass_test=True,
+                 only_xy = True
+                 ):
+        super().__init__(renders = renders, only_xy=only_xy, ag_only_self = ag_only_self, relative=True, pointmass_test=pointmass_test)
+
+
+
+class ur5Env_pointmasstest_object(ur5Env):
+    def __init__(self,
+                 renders=False,
+                 ag_only_self=False,
+                 relative= True,
+                 only_xy = True,
+                 reward_scaling = 50,
+                 pointmass_test=True
+                 ):
+        super().__init__(renders = renders, pointmass_test=pointmass_test, ag_only_self = ag_only_self, num_objects=1, relative = relative, only_xy=only_xy, reward_scaling=reward_scaling)
+
+
+
+
+class ur5Env_2D_objects(ur5Env):
+    def __init__(self,
+                 renders=False,
+                 ag_only_self=False,
+                 relative= True,
+                 only_xy = True,
+                 reward_scaling = 50,
+                 ):
+        super().__init__(renders = renders, ag_only_self = ag_only_self, num_objects=1, relative = relative, only_xy=only_xy, reward_scaling=reward_scaling)
+
 
 ##############################################################################################################
-
-
 
 
 def move_in_xyz(environment, arm, abs_rel):
@@ -645,8 +744,8 @@ def str_to_bool(string):
 def launch(mode, arm, abs_rel, render):
     print(arm)
     
-    #environment = ur5Env(renders=str_to_bool(render), arm = arm)
-    environment = ur5Env_objects(renders=str_to_bool(render))
+    #environment = ur5Env(renders=str_to_bool(render), relative=  False, only_xy = True, pointmass_test=True)
+    environment = ur5Env_objects(renders=str_to_bool(render), relative=  False)
     environment.reset()
 
     print(mode)
