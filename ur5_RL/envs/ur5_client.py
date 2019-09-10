@@ -110,12 +110,13 @@ def move_in_xyz(environment, arm, abs_rel,s, record, play_sequence):
             #print('recieving')
             data = s.recv(1024)
             action = pickle.loads(data)
+            print(action[0:3])
             #print('Received', action )
             state, reward, done, info = environment.step(action)
             grip_img = gripper_camera(state['observation'])
             #time.sleep(0.01)
             if record:
-                print(time.time())
+                #print(time.time())
 
                 actions.append(action)
                 observations.append(np.array(state['observation']))

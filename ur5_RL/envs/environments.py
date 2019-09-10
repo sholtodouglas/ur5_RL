@@ -417,7 +417,7 @@ class ur5Env(gym.GoalEnv):
 
         #if self._renders:
             #update_camera(self._p)
-        print(time.time())
+        
 
         action = np.array(action).copy()
         #new_x,new_y = action[0], action[1]

@@ -37,6 +37,8 @@ ANALOG=3
 BUTTONS=6
 BUTTON_2 = (6,2) # indices
 
+
+
 def basic_vr_env(s):
     last_button_2_push = time.time()
     gravity = -10
@@ -83,6 +85,7 @@ def basic_vr_env(s):
             past_ori = ori
 
             if e[BUTTON_2[0]][BUTTON_2[1]] >=1 and (time.time() >= last_button_2_push+1):
+                print("offsetting")
                 last_button_2_push = time.time()
                 xyz_offset = np.array(e[POSITION])
         
@@ -100,15 +103,14 @@ def basic_vr_env(s):
                 # another button to work with if we want
 
             data = conn.recv(1024)
-            print('recv')
+            
             if not data:
               print('breaking')
               break
             action = pickle.dumps(action)
-            print('dumped')
+            
             conn.sendall(action)
-            print('sent')
-
+            
            except Exception as e:
             pass
             print(e)

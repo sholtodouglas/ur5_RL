@@ -221,7 +221,8 @@ class ur5:
         positionGains = [0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.03, 0.03]
         
         if self.three_D:
-            self._p.setJointMotorControlArray(self.uid, indexes, self._p.POSITION_CONTROL, targetPositions=poses, targetVelocities =[0.0]*l, 
+            self._p.setJointMotorControlArray(self.uid, indexes, self._p.POSITION_CONTROL, targetPositions=poses, targetVelocities =[0.0]*l,
+                positionGains = positionGains, forces  =forces)
         #holy shit this is so much faster in arrayform!
         else:
             # well this is just a bit shit hey - if we want this to work, need to fix the positions of 0,4,5,7.
@@ -251,7 +252,7 @@ class ur5:
 
         #at the moment UR5 only absolute
         #TODO Don't have this so limiting?
-        position_delta = np.clip(position_delta, [-0.14, -0.6, -0.1, -1, -1, -1, -1, 0], [1, 1, 1, 1, 1, 1, 1, 1])
+        position_delta = np.clip(position_delta, [-0.3, -0.6, 0.14, -1, -1, -1, -1, 0], [1, 1, 1, 1, 1, 1, 1, 1])
 
         x = position_delta[0]
         y = position_delta[1]
