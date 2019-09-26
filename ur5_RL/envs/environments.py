@@ -116,7 +116,8 @@ class ur5Env(gym.GoalEnv):
                  only_xyzr=True,
                  only_xy= False,
                  reward_scaling = 1,
-                 pointmass_test = False):
+                 pointmass_test = False,
+                 curriculum_learn = False):
         #pos_cntrl is whether we control the motors or we control the position of 
         # head and gripper. 
         # ag_only_self is whether we want to have the objects as the achieved goal
@@ -145,6 +146,7 @@ class ur5Env(gym.GoalEnv):
         self.roving_goal = False
         self.reward_scaling = reward_scaling
         self.pointmass_test = pointmass_test
+        self.curriculum_learn = curriculum_learn
 
         if pos_cntrl:
             action_dim = 8
@@ -186,8 +188,11 @@ class ur5Env(gym.GoalEnv):
             achieved_goal=spaces.Box(-high_goal, high_goal),
             observation=spaces.Box(-high_obs, high_obs),
         ))
-        
-        
+
+    def sample_curriculum(self,observations):
+        index = np.random.randint(0, len(observations))
+        s_i = observations[index]
+        return s_i
 
     def reset(self, arm='ur5'):
         
@@ -205,8 +210,11 @@ class ur5Env(gym.GoalEnv):
             #    self._p.setRealTimeSimulation(1)
             # else:
             #    self._p.connect(p.DIRECT)
+            print('***********************',self._renders)
+
             if self._renders:
                 self._p = bullet_client.BulletClient(connection_mode=p.GUI)
+                print('yo')
                 #setup_controllable_camera(self._p)
             else:
                 self._p = bullet_client.BulletClient(connection_mode=p.DIRECT)
@@ -257,6 +265,12 @@ class ur5Env(gym.GoalEnv):
                 self._p.setCollisionFilterGroupMask(self.goal, -1, collisionFilterGroup, collisionFilterMask)
                 self.goal_cid = self._p.createConstraint(self.goal,-1,-1,-1,self._p.JOINT_FIXED,[1,1,1.4],[0,0,0],[0,0,0],[0,0,0,1])
 
+            if self.curriculum_learn:
+                self.curriculum_obs = np.load(currentdir+'/curriculum/demo_o.npy')
+
+            self._arm.resetJointPoses()
+            arm_obs = self._arm.state()
+            self.default_ori = arm_obs['orn']
             ############## Feeling cute, might delete later idk #####################################
             if self.pointmass_test:
                 sphereRadius = 0.03
@@ -276,19 +290,24 @@ class ur5Env(gym.GoalEnv):
             ##################################################################################################
 
         else:
-            print('Resetting')
+            pass
 
 
         self._envStepCounter = 0
-        self.reset_objects()
-        self.reset_goal_pos()
-        self._arm.resetJointPoses()
-        arm_obs = self._arm.state()
-        self.default_ori = arm_obs['orn']
+        if self.curriculum_learn:
+            s_i = self.sample_curriculum(self.curriculum_obs)
+            self.initialize_start_pos(s_i)
+            self.reset_goal_pos()
+
+        else:
+            self.reset_objects()
+            self.reset_goal_pos()
+            self._arm.resetJointPoses()
 
         if self.pointmass_test:
             self._p.resetBasePositionAndOrientation(self.mass, [0, 0, 0.05], [0, 0, 0, 1])
             self._p.changeConstraint(self.mass_cid, [0, 0, 0.05], maxForce=100)
+
 
 
 
@@ -355,11 +374,13 @@ class ur5Env(gym.GoalEnv):
     def initialize_start_pos(self,start_state):
         # the only time we will be initializeing this is if we have the joint positions.
         #  according to state arm pose
-        self._arm.setJointPose(start_state[11:19])
-        obj_list= []
-        for o in range(0,len(self.objects)):
-            obj_list.append(start_state[19+o*7:26+o*7])
-        self.reset_objects(obj_list) # one object
+        for i in range(0, 100): # for some reason needs this to make sure
+            self._arm.setJointPose(start_state[11:19])
+            obj_list= []
+            for o in range(0,len(self.objects)):
+                obj_list.append(start_state[19+o*7:26+o*7])
+
+            self.reset_objects(obj_list) # one object
 
 
 
@@ -490,7 +511,8 @@ class ur5Env(gym.GoalEnv):
                     print('rove')
                     self.reset_goal_pos()
 
-        return obs, reward, False, {}
+        success = 0 if reward < 0 else 1 # assuming negative rewards
+        return obs, reward, False, {'is_success':success}
 
 
 
@@ -504,15 +526,16 @@ class ur5Env(gym.GoalEnv):
 
     def compute_reward(self, achieved_goal, desired_goal, info = None):
 
-        distance = np.sum(abs(achieved_goal-desired_goal))
-        
-        if distance < 0.03:
-            reward  = 1#50.0
-        else:
-            reward = 0#0.0
-        
-        
-        return reward
+        if len(achieved_goal.shape) > 1:
+            #vectorized
+            distance = np.sum(abs(achieved_goal-desired_goal),axis = 1)
+        else: #single examples
+            distance = np.sum(abs(achieved_goal - desired_goal))
+
+        return -(distance>0.05).astype(np.float32)
+
+        # if positive
+        # return (dist<0.3).astype(np.float32)
 
     def activate_roving_goal(self):
         self.roving_goal = True
@@ -542,9 +565,10 @@ class ur5Env_objects(ur5Env):
     def __init__(self,
                  renders=False,
                  ag_only_self=False,
-                 relative= True
+                 relative= True,
+                 curriculum_learn=False
                  ):
-        super().__init__(renders = renders, ag_only_self = ag_only_self, num_objects=1, relative = relative)
+        super().__init__(curriculum_learn=curriculum_learn,renders = renders, ag_only_self = ag_only_self, num_objects=1, relative = relative)
 
 class ur5Env_reacher_relative(ur5Env):
     def __init__(self,
@@ -571,7 +595,8 @@ class ur5Env_pointmasstest_object(ur5Env):
                  relative= True,
                  only_xy = True,
                  reward_scaling = 50,
-                 pointmass_test=True
+                 pointmass_test=True,
+
                  ):
         super().__init__(renders = renders, pointmass_test=pointmass_test, ag_only_self = ag_only_self, num_objects=1, relative = relative, only_xy=only_xy, reward_scaling=reward_scaling)
 

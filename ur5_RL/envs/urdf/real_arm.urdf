@@ -221,7 +221,7 @@
   </joint>
 <link name="left_gripper">
     <contact>
-      <lateral_friction value="1.0"/>
+      <lateral_friction value="1"/>
       <inertia_scaling value="3.0"/>
     </contact>
     <inertial>
@@ -252,7 +252,7 @@
   </joint>
   <link name="right_gripper">
     <contact>
-      <lateral_friction value="1.0"/>
+      <lateral_friction value="1"/>
       <inertia_scaling value="3.0"/>
     </contact>
     <inertial>
