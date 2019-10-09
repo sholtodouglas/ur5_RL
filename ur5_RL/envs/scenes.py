@@ -85,26 +85,41 @@ def load_lab_Z_up(p):
 	block_blue = [p.loadURDF((os.path.join(meshPath,"block_blue.urdf")), -0.05,0.0,0,0.400000,0.707107,0.000000,0.707107)]
 	return [jenga, block_red, block_blue, plate]
 
-def one_block_scene(p):
-	planeId = p.loadURDF(os.path.join(urdfRoot,"plane.urdf"), [0,0,-0.1])
-	colcubeId = p.createCollisionShape(p.GEOM_BOX, halfExtents=[0.02, 0.02, 0.02])
-	object = [p.createMultiBody(0.1, colcubeId, 2, [0, 0, 0.05], [0.000000,0.000000,0.0,1.0])]
-
-
-	#object = [p.loadURDF((os.path.join(meshPath,"cube_small.urdf")), [0.0,0.0,0.05],[0.400000,0.0,0.000000,1.0])]
-	table = [p.loadURDF((os.path.join(urdfRoot,"table/table.urdf")), [0.0,0.0,-0.6300],[0.000000,0.000000,0.0,1.0])]
+def create_walls(p):
 	colwallId = p.createCollisionShape(p.GEOM_BOX,halfExtents=[0.05,1.0,0.5])
 	wall = [p.createMultiBody(0,colwallId ,2,[1.0,0,0.0], p.getQuaternionFromEuler([0,0,0]))]
 	wall = [p.createMultiBody(0,colwallId ,2,[-1.0,0,0.0], p.getQuaternionFromEuler([0,0,0]))]
 	wall = [p.createMultiBody(0,colwallId ,2,[0,1.0,0], p.getQuaternionFromEuler([0,0,math.pi/2]))]
 	wall = [p.createMultiBody(0,colwallId ,2,[0,-1.0,0], p.getQuaternionFromEuler([0,0,math.pi/2]))]
-	return [object]
+
 
 def basic_scene(p):
-	# the expected different number of inputs erro comes from urdf wanting vec3 then vec4 for some reason 
+	# the expected different number of inputs erro comes from urdf wanting vec3 then vec4 for some reason
 	# different between the p import and the clients.
+	planeId = p.loadURDF(os.path.join(urdfRoot, "plane.urdf"), [0, 0, -0.1])
 	table = [p.loadURDF((os.path.join(urdfRoot,"table/table.urdf")), [0.0,0.0,-0.6300],[0.000000,0.000000,0.0,1.0])]
 	return []
+
+
+def one_block_scene(p):
+
+	colcubeId = p.createCollisionShape(p.GEOM_BOX, halfExtents=[0.02, 0.02, 0.02])
+	object = [p.createMultiBody(0.1, colcubeId, 2, [0, 0, 0.05], [0.000000,0.000000,0.0,1.0])]
+	#object = [p.loadURDF((os.path.join(meshPath,"cube_small.urdf")), [0.0,0.0,0.05],[0.400000,0.0,0.000000,1.0])]
+
+	create_walls(p)
+	return [object]
+
+def tools_scene(p):
+	basic_scene(p)
+	create_walls(p)
+	colrectId = p.createCollisionShape(p.GEOM_BOX, halfExtents=[0.08, 0.02, 0.02])
+	tool = [p.createMultiBody(0.1, colrectId, 2, [0, 0, 0.05], [0.000000, 0.000000, 0.0, 1.0])]
+
+	colcubeId = p.createCollisionShape(p.GEOM_BOX, halfExtents=[0.02, 0.02, 0.02])
+	object = [p.createMultiBody(0.1, colcubeId, 2, [0, 0, 0.05], [0.000000, 0.000000, 0.0, 1.0])]
+
+	return [tool, object]
 
 
 def scene_2D(p):

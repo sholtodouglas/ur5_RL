@@ -117,7 +117,8 @@ class ur5Env(gym.GoalEnv):
                  only_xy= False,
                  reward_scaling = 1,
                  pointmass_test = False,
-                 curriculum_learn = False):
+                 curriculum_learn = False,
+                 tools=False):
         #pos_cntrl is whether we control the motors or we control the position of 
         # head and gripper. 
         # ag_only_self is whether we want to have the objects as the achieved goal
@@ -147,6 +148,7 @@ class ur5Env(gym.GoalEnv):
         self.reward_scaling = reward_scaling
         self.pointmass_test = pointmass_test
         self.curriculum_learn = curriculum_learn
+        self.tools=  tools
 
         if pos_cntrl:
             action_dim = 8
@@ -171,9 +173,12 @@ class ur5Env(gym.GoalEnv):
             goal_dim = 3
             
         else:
-
-            goal_dim = 3*num_objects # xyz,quat for each object.
-            obs_dim += 7*num_objects
+            if self.tools:
+                goal_dim = 3
+                obs_dim += 7 * num_objects
+            else:
+                goal_dim = 3*num_objects # xyz,quat for each object.
+                obs_dim += 7*num_objects
 
 
         # actions are xyz space, quaternion, gripper. 
@@ -240,7 +245,10 @@ class ur5Env(gym.GoalEnv):
             if self.ag_only_self:
                 self.objects = basic_scene(self._p)
             else:
-                self.objects = one_block_scene(self._p)
+                if self.tools:
+                    self.objects = tools_scene(self._p)
+                else:
+                    self.objects = one_block_scene(self._p)
             
 
             self._p.setGravity(0, 0, -10)
@@ -339,7 +347,20 @@ class ur5Env(gym.GoalEnv):
                     goal_z = self.np_random.uniform(low=0.00, high=0.1)
                 if self.only_xy:
                     goal_z = 0.025
-                goal_pos = [goal_x,goal_y,goal_z]
+                if self.tools:
+                    goal_x = 0.31
+                    goal_z = 0.02
+
+                goal_pos = np.array([goal_x, goal_y, goal_z])
+                self.goal_pos = goal_pos
+                # change the position if its too close to the goal
+                while self.compute_reward(self.getSceneObservation()['achieved_goal'], np.array(goal_pos)) >= 0:
+                    self.goal_pos += (np.random.rand(3) * 0.1) - 0.05
+
+
+
+
+
 
             self.goal_pos = goal_pos
 
@@ -363,7 +384,14 @@ class ur5Env(gym.GoalEnv):
                 new_x  = self.np_random.uniform(low=-self.TARG_LIMIT/2, high=self.TARG_LIMIT/2)
                 new_y  = self.np_random.uniform(low=-self.TARG_LIMIT/2, high=self.TARG_LIMIT/2)
                 new_z = self.np_random.uniform(low=0.05, high=0.05)
-                new_pos = [new_x,new_y,new_z, 0,0,0,1]
+
+
+                if self.tools:
+                    if idx == 1:
+                        # then we are at the object in the tool use case
+                        new_x = 0.31 # put the object just out of reach
+                new_pos = [new_x, new_y, new_z, 0, 0, 0, 1]
+
             else:
                 new_pos = positions[idx]
 
@@ -400,15 +428,21 @@ class ur5Env(gym.GoalEnv):
 
             observation = list(arm_obs['pos']) + list(arm_obs['gripper']) + list(arm_obs['pos_vel'])
 
+
+
         #top_down_img =self._p.getCameraImage(500, 500, viewMatrix,projectionMatrix, shadow=0,renderer=image_renderer)
         #grip_img = self.gripper_camera(self._observation)
         if self.ag_only_self:
             achieved_goal = np.array(arm_obs['pos'])
         else:
             index = 0
-            for o in self.objects:
-                achieved_goal = np.array(scene_obs[index:index+3]) # note ag is only pos of first object doesn't includes orienation of scene obs.
-                index+= 7 #to skip the orientation. at the moment we only care about ag in terms of position
+            if self.tools:
+                index = 7
+                achieved_goal = np.array(scene_obs[index:index + 3]) # only take the last object
+            else:
+                for o in self.objects: # TODO this don't work fully yet, need to account for multiple objects
+                    achieved_goal = np.array(scene_obs[index:index+3]) # note ag is only pos of first object doesn't includes orienation of scene obs.
+                    index+= 7 #to skip the orientation. at the moment we only care about ag in terms of position
             observation += list(scene_obs) # but observation gets the full obs
 
         goal  = np.array(self.goal_pos)
@@ -560,6 +594,14 @@ class ur5Env(gym.GoalEnv):
         img =self._p.getCameraImage(200, 200, view_matrix_gripper, projectionMatrix,shadow=0, flags =self._p.ER_NO_SEGMENTATION_MASK, renderer=image_renderer)
 
 
+class ur5Env_tools(ur5Env):
+    def __init__(self,
+                 renders=False,
+                 ag_only_self=False,
+                 relative= True,
+                 curriculum_learn=False
+                 ):
+        super().__init__(curriculum_learn=curriculum_learn,renders = renders, ag_only_self = ag_only_self, num_objects=2, relative = relative, tools = True)
 
 class ur5Env_objects(ur5Env):
     def __init__(self,
@@ -772,7 +814,9 @@ def launch(mode, arm, abs_rel, render):
     print(arm)
     
     #environment = ur5Env(renders=str_to_bool(render), relative=  False, only_xy = True, pointmass_test=True)
-    environment = ur5Env_objects(renders=str_to_bool(render), relative=  False)
+    #environment = ur5Env_objects(renders=str_to_bool(render), relative=  False)
+    environment = ur5Env_tools(renders=str_to_bool(render), relative=False)
+
     environment.reset()
 
     print(mode)
