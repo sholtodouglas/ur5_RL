@@ -12,7 +12,7 @@ urdfRoot=pybullet_data.getDataPath()
 meshPath = currentdir+"/meshes/objects/"
 print(meshPath)
 
-def load_arm_dim_up(p,arm, dim = 'Z'):
+def load_arm_dim_up(p,arm, dim = 'Z', offset_x = 0.1):
 	if arm == 'ur5':
 		if dim == '2D':
 			_arm = ur5(p,three_D = False)
@@ -32,7 +32,7 @@ def load_arm_dim_up(p,arm, dim = 'Z'):
 		_arm.setPosition([0,0,0.3], [arm_rot[0],arm_rot[1],arm_rot[2],arm_rot[3]])
 	else:
 		arm_rot =p.getQuaternionFromEuler([0,0.0,0])
-		_arm.setPosition([-0.6,0.0,-0.1], [arm_rot[0],arm_rot[1],arm_rot[2],arm_rot[3]])
+		_arm.setPosition([-0.6+offset_x,0.0,-0.1], [arm_rot[0],arm_rot[1],arm_rot[2],arm_rot[3]])
 	return _arm
 
 
@@ -120,6 +120,31 @@ def tools_scene(p):
 	object = [p.createMultiBody(0.1, colcubeId, 2, [0, 0, 0.05], [0.000000, 0.000000, 0.0, 1.0])]
 
 	return [tool, object]
+
+def camera_test(p):
+	extents = 0.25
+
+	colcubeId = p.createCollisionShape(p.GEOM_BOX, halfExtents=[0.01, 0.01, 0.01])
+	object = [p.createMultiBody(0.1, colcubeId, 2, [extents, extents, 0.05], [0.000000, 0.000000, 0.0, 1.0])]
+	#object = [p.createMultiBody(0.1, colcubeId, 2, [-extents, extents, 0.05], [0.000000, 0.000000, 0.0, 1.0])]
+	#object = [p.createMultiBody(0.1, colcubeId, 2, [extents, -extents, 0.05], [0.000000, 0.000000, 0.0, 1.0])]
+	object = [p.createMultiBody(0.1, colcubeId, 2, [-extents, -extents, 0.05], [0.000000, 0.000000, 0.0, 1.0])]
+
+def lego_scene(p):
+
+	planeId = p.loadURDF(os.path.join(urdfRoot, "plane.urdf"), [0, 0, -0.1])
+	table = [
+		p.loadURDF((os.path.join(urdfRoot, "table/table.urdf")), [0.0, 0.0, -0.6300], [0.000000, 0.000000, 1.0, 1.0])]
+	create_walls(p)
+	colrectId = p.createCollisionShape(p.GEOM_BOX, halfExtents=[0.08, 0.02, 0.02])
+	tool = [p.createMultiBody(0.1, colrectId, 2, [0, 0, 0.05], [0.000000, 0.000000, 0.0, 1.0])]
+	lego1 = [p.createMultiBody(0.1, colrectId, 2, [0.1, 0, 0.05], [0.000000, 0.000000, 0.0, 1.0])]
+	lego2 = [p.createMultiBody(0.1, colrectId, 2, [0, 0.1, 0.05], [0.000000, 0.000000, 0.0, 1.0])]
+	colcubeId = p.createCollisionShape(p.GEOM_BOX, halfExtents=[0.02, 0.02, 0.02])
+	object = [p.createMultiBody(0.1, colcubeId, 2, [0, 0, 0.05], [0.000000, 0.000000, 0.0, 1.0])]
+
+	#camera_test(p)
+	return [tool, object, lego1, lego2]
 
 
 def scene_2D(p):

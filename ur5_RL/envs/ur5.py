@@ -215,7 +215,7 @@ class ur5:
             else:
                 poses.append(motorCommands[i])
                 indexes.append(joint.id)
-                forces.append(joint.maxForce*10)
+                forces.append(joint.maxForce*5)
 
         l = len(poses)
         arm_gain = 0.1
@@ -254,7 +254,7 @@ class ur5:
 
         #at the moment UR5 only absolute
         #TODO Don't have this so limiting?
-        position_delta = np.clip(position_delta, [-0.3, -0.6, 0.14, -1, -1, -1, -1, 0], [1, 1, 1, 1, 1, 1, 1, 1])
+        position_delta = np.clip(position_delta, [-0.38, -0.6, 0.14, -1, -1, -1, -1, 0], [1, 1, 1, 1, 1, 1, 1, 1])
 
         x = position_delta[0]
         y = position_delta[1]
@@ -265,7 +265,7 @@ class ur5:
 
         # define our limits. 
         z = max(0.14, min(0.7,z))
-        x = max(-0.3, min(0.7,x))
+        x = max(-0.38, min(0.7,x))
         y =max(-0.6, min(0.6,y))
         if real:
             

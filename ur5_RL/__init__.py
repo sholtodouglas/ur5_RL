@@ -18,6 +18,14 @@ register(
 
 
 register(
+    id='ur5_RL_lego-v0',
+    entry_point='ur5_RL.envs:ur5Env_lego',
+    max_episode_steps=20,
+)
+
+
+
+register(
     id='ur5_RL_2Dobjects-v0',
     entry_point='ur5_RL.envs:ur5Env_2D_objects',
     max_episode_steps=50,
