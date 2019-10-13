@@ -111,7 +111,7 @@ class ur5Env(gym.GoalEnv):
                  pos_cntrl=True,
                  ag_only_self=True,
                  state_arm_pose=True,
-                 only_xyz=True,
+                 only_xyz=False,
                  num_objects=0,
                  relative=False,
                  only_xyzr=True,
@@ -163,8 +163,7 @@ class ur5Env(gym.GoalEnv):
         else:
             # size 3 + 1 + 3
             obs_dim = 7  # xyz, quat, gripper
-            if not self.only_xyz:
-                obs_dim += 7
+
 
         if ag_only_self:
             goal_dim = 3
@@ -190,10 +189,6 @@ class ur5Env(gym.GoalEnv):
             observation=spaces.Box(-high_obs, high_obs),
         ))
 
-    def sample_curriculum(self, observations):
-        index = np.random.randint(0, len(observations))
-        s_i = observations[index]
-        return s_i
 
     def reset(self, arm='ur5'):
 
@@ -271,7 +266,7 @@ class ur5Env(gym.GoalEnv):
         self.reset_pos  =np.array([-0.25,0,0.5])
         done = False
         while not done:
-            done = self.go_to_point(self.reset_pos, gripper = 1) #reset
+            done = self.go_to_point(self.reset_pos, self.default_ori, gripper = 1) #reset
 
         return self.get_viz_obs()
 
@@ -297,7 +292,7 @@ class ur5Env(gym.GoalEnv):
     def reset_objects(self, positions=None):
 
         for idx, o in enumerate(self.objects):
-            print(idx)
+
             if positions is None:
 
                 new_x = self.np_random.uniform(low=-self.TARG_LIMIT / 2, high=self.TARG_LIMIT / 2)
@@ -340,13 +335,14 @@ class ur5Env(gym.GoalEnv):
     # moves motors to desired pos
 
 
-    def go_to_point(self,position, gripper = 0, slow_factor = 8):
+    def go_to_point(self,position, ori, gripper = 0, slow_factor = 8):
 
 
         gripperPos = self._arm.state()['pos']
         self._p.addUserDebugLine(position, gripperPos, lifeTime = 1.0)
         object_rel_pos = position - gripperPos  # lastObs['observation'][6:9]
         action = [0, 0, 0, 0, 0, 0, 0, 0]
+        action[3:7] =  ori
         object_oriented_goal = object_rel_pos.copy()/slow_factor + gripperPos
         for i in range(len(object_oriented_goal)):
             action[i] = object_oriented_goal[i]# * 6
@@ -362,14 +358,14 @@ class ur5Env(gym.GoalEnv):
 
 # 0.3 and 0.125
 
-    def grasp_primitive(self, point):
+    def grasp_primitive(self, point, angle = 0):
         time_limit = 100
         done = False
         cnt = 0
-
+        ori = p.getQuaternionFromEuler(np.array(p.getEulerFromQuaternion(self.default_ori)) + np.array([angle*math.pi/180.0, 0, 0]))
         while not done and cnt < time_limit:
 
-            done = self.go_to_point(point + np.array([0,0,0.3]), gripper=0, slow_factor =1) # go above the point
+            done = self.go_to_point(point + np.array([0,0,0.3]), ori, gripper=0, slow_factor =1) # go above the point
             cnt += 1
 
         done = False
@@ -377,15 +373,25 @@ class ur5Env(gym.GoalEnv):
         cnt = 0
         while not done and cnt < time_limit:
 
-            done = self.go_to_point(point + np.array([0, 0, 0.135]), gripper=0, slow_factor = 8) # descend on the point
+            done = self.go_to_point(point + np.array([0, 0, 0.135]), ori, gripper=0, slow_factor = 8) # descend on the point
             cnt += 1
         done = False
         for i in range(0,20):
-            self.go_to_point(point + np.array([0, 0, 0.135]), gripper=1, slow_factor = 8) # close the gripper
+            self.go_to_point(point + np.array([0, 0, 0.135]), ori, gripper=1, slow_factor = 8) # close the gripper
         cnt = 0
         while not done and cnt < time_limit:
-            done = self.go_to_point(np.array([-0.25,0,0.5]), gripper = 1, slow_factor = 12) #take object up
+            done = self.go_to_point(np.array([-0.25,0,0.5]),ori, gripper = 1, slow_factor = 12) #take object up
             cnt += 1
+
+
+    def push_primitive(self, point, angle = 0):
+
+        time_limit = 100
+        done = False
+        cnt = 0
+        ori = p.getQuaternionFromEuler(
+            np.array(p.getEulerFromQuaternion(self.default_ori)) + np.array([angle * math.pi / 180.0, 0, 0]))
+
 
 
     def step_sim(self, action):
@@ -398,31 +404,11 @@ class ur5Env(gym.GoalEnv):
         action = np.array(action).copy()
         # new_x,new_y = action[0], action[1]
 
-        # self.action_buffer.append(action[0:7])
-        if self.relative:
-            action[0:7] = action[0:7] * 0.05
-            action = list(action)
-
-            observation = self._arm.state()
-            # action is xyz positon, orietnation quaternion, gripper closedness.
-            commanded_ori = list(action[3:7])
-            action[0:3] = list(np.array(action[0:3]) + np.array(observation['pos']))
-            # commanded_ori = list((np.array(commanded_ori) + np.array(observation['orn'])))
-            action = action[0:3] + commanded_ori + [action[7]]
-
-            # if self.pointmass_test:
-            #     action[0] = new_x
-            #     action[1] = new_y
-
         if self.pos_cntrl:
 
-            if self.only_xyz:  # we want to make sure the orientation here is always down
-                action[3:7] = self.default_ori
-                if self.only_xy:
-                    action[2] = 0.1  # suspend above table
-                    action[7] = 1
-                if self.pointmass_test:
-                    action[2] = 0.4  # get it out of the way of pointmass boi
+
+            #action[3:7] = self.default_ori
+
 
             self._arm.move_to(action)
         else:
@@ -447,8 +433,8 @@ class ur5Env(gym.GoalEnv):
 
         return obs
 
-    def step(self, action):
-        self.grasp_primitive(action)
+    def step(self, action, angle = 0):
+        self.grasp_primitive(action[0:3], action[3])
 
         self._envStepCounter += 1
 
@@ -545,6 +531,7 @@ class ur5Env_lego(ur5Env):
 
 
 def move_in_xyz(environment, arm, abs_rel):
+    print('dacing')
     motorsIds = []
 
     dv = 0.1
@@ -592,6 +579,7 @@ def move_in_xyz(environment, arm, abs_rel):
     gg = environment._p.addUserDebugParameter("grasper", 0, 1.5, 0)
 
     done = False
+
     while (not done):
 
         action = []
@@ -609,7 +597,11 @@ def move_in_xyz(environment, arm, abs_rel):
         # action is xyz positon, orietnation quaternion, gripper closedness.
 
         action = action[0:3] + list(p.getQuaternionFromEuler(action[3:6])) + [action[6]]
-        print(action)
+        observation = environment._arm.state()
+
+        ori = p.getEulerFromQuaternion(observation['orn'][0:4])
+        print(np.array(ori)*180/math.pi)
+
 
         environment.step_sim(action)
 
@@ -718,34 +710,3 @@ if __name__ == "__main__":
 
 
 
-
-
-
-
-
-    # def take_to_point(lastObs, point):
-    #
-    #     objectPos = lastObs['observation'][19:22]
-    #
-    #     env.render()
-    #     action = [0, 0, 0, 0, 0, 0, 0, 0]
-    #     for i in range(len(point - objectPos)):
-    #         action[i] = (point - objectPos)[i] * 6
-    #
-    #     action[len(action) - 1] = 1
-    #
-    #     obsDataNew, reward, done, info = env.step(action)
-    #
-    #     episodeAcs.append(action)
-    #     episodeInfo.append(info)
-    #     episodeObs.append(obsDataNew)
-    #
-    #     objectPos = obsDataNew['observation'][19:22]
-    #
-    #     gripperPos = obsDataNew['observation'][0:3]
-    #     object_rel_pos = objectPos - gripperPos  # lastObs['observation'][6:9]
-    #
-    #
-    #     restart = True if np.linalg.norm(objectPos[0:2] - gripperPos[0:2]) >= 0.2 else False
-    #
-    #     return obsDataNew, restart
